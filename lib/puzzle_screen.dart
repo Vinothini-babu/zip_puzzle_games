@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'app_state.dart';
 import 'level_data.dart';
 import 'level_complete_screen.dart';
+import 'how_to_play_dialog.dart';
 import 'zip_puzzle_generator.dart';
 import 'zip_puzzle_grid.dart';
 
@@ -34,7 +35,19 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
       cols: widget.level.cols,
       checkpointCount: widget.level.checkpointCount,
     );
-    _stopwatch.start();
+    // Show the tutorial only when starting Level 1, once the first frame
+    // has rendered (so the puzzle screen is visible behind the dialog).
+    // The timer starts only after the player dismisses it, so reading
+    // the instructions doesn't eat into their speed-bonus window.
+    if (widget.level.id == 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await HowToPlayDialog.show(context);
+        _stopwatch.start();
+      });
+    } else {
+      _stopwatch.start();
+    }
   }
 
   /// Coin reward scales with how well the player performed:
@@ -63,7 +76,7 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
     final coinsEarned = _computeReward();
     AppState.instance.completeLevel(widget.level.id, coinsEarned);
 
-    Future.delayed(const Duration(milliseconds: 1400), () {
+    Future.delayed(const Duration(milliseconds: 1600), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(

@@ -26,7 +26,7 @@ class ZipPuzzleGrid extends StatefulWidget {
 }
 
 class _ZipPuzzleGridState extends State<ZipPuzzleGrid>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final List<Cell> _playerPath = [];
   String? _errorMessage;
   bool _solved = false;
@@ -52,9 +52,22 @@ class _ZipPuzzleGridState extends State<ZipPuzzleGrid>
     TweenSequenceItem(tween: Tween(begin: 0.15, end: 1.0), weight: 1),
   ]).animate(_blinkController);
 
+  late final AnimationController _entranceController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  )..forward();
+  late final Animation<double> _entranceScale = CurvedAnimation(
+    parent: _entranceController,
+    curve: Curves.easeOutBack,
+  );
+
+  double _cleanScale = 1.0;
+  double _shareScale = 1.0;
+
   @override
   void dispose() {
     _blinkController.dispose();
+    _entranceController.dispose();
     super.dispose();
   }
 
@@ -177,83 +190,163 @@ class _ZipPuzzleGridState extends State<ZipPuzzleGrid>
             final boardSide = maxSquareSide.clamp(0, 480).toDouble();
             _cellSize = boardSide / widget.puzzle.cols;
 
-            return SizedBox(
-              width: boardSide,
-              height: boardSide,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  GestureDetector(
-                    onPanStart: (details) => _handleStart(details.localPosition),
-                    onPanUpdate: (details) => _handleUpdate(details.localPosition),
-                    onPanEnd: (_) => _handleEnd(),
-                    child: AnimatedBuilder(
-                      animation: _blinkController,
-                      builder: (context, _) => CustomPaint(
-                        size: Size(boardSide, boardSide),
-                        painter: _GridPainter(
-                          puzzle: widget.puzzle,
-                          playerPath: _playerPath,
-                          cellSize: _cellSize,
-                          primaryColor: _primaryTeal,
-                          lightColor: _lightTeal,
-                          errorMode: _errorMessage != null || !_liveValid,
-                          errorColor: _errorRed,
-                          pathOpacity: _solved ? _blinkOpacity.value : 1.0,
+            return ScaleTransition(
+              scale: _entranceScale,
+              child: SizedBox(
+                width: boardSide,
+                height: boardSide,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _primaryTeal, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _primaryTeal.withOpacity(0.18),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
-                      ),
+                      ],
                     ),
-                  ),
-                  // Success celebration: dims the board and pops a checkmark
-                  // badge in, giving the player a clear "you solved it"
-                  // moment before the screen navigates away.
-                  AnimatedOpacity(
-                    opacity: _solved ? 1 : 0,
-                    duration: const Duration(milliseconds: 250),
-                    child: IgnorePointer(
-                      child: Container(
-                        width: boardSide,
-                        height: boardSide,
-                        color: Colors.black.withOpacity(0.15),
-                        alignment: Alignment.center,
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.4, end: 1.0),
-                          duration: const Duration(milliseconds: 450),
-                          curve: Curves.elasticOut,
-                          builder: (context, scale, child) => Transform.scale(
-                            scale: _solved ? scale : 0,
-                            child: child,
-                          ),
-                          child: Container(
-                            width: 84,
-                            height: 84,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        GestureDetector(
+                          onPanStart: (details) => _handleStart(details.localPosition),
+                          onPanUpdate: (details) => _handleUpdate(details.localPosition),
+                          onPanEnd: (_) => _handleEnd(),
+                          child: AnimatedBuilder(
+                            animation: _blinkController,
+                            builder: (context, _) => CustomPaint(
+                              size: Size(boardSide, boardSide),
+                              painter: _GridPainter(
+                                puzzle: widget.puzzle,
+                                playerPath: _playerPath,
+                                cellSize: _cellSize,
+                                primaryColor: _primaryTeal,
+                                lightColor: _lightTeal,
+                                errorMode: _errorMessage != null || !_liveValid,
+                                errorColor: _errorRed,
+                                pathOpacity: _solved ? _blinkOpacity.value : 1.0,
+                              ),
                             ),
-                            child: const Icon(Icons.check_rounded,
-                                color: _primaryTeal, size: 52),
                           ),
                         ),
-                      ),
+                        // Success celebration: dims the board and pops a checkmark
+                        // badge in, giving the player a clear "you solved it"
+                        // moment before the screen navigates away.
+                        AnimatedOpacity(
+                          opacity: _solved ? 1 : 0,
+                          duration: const Duration(milliseconds: 250),
+                          child: IgnorePointer(
+                            child: Container(
+                              width: boardSide,
+                              height: boardSide,
+                              color: Colors.black.withOpacity(0.15),
+                              alignment: Alignment.center,
+                              child: TweenAnimationBuilder<double>(
+                                tween: Tween(begin: 0.4, end: 1.0),
+                                duration: const Duration(milliseconds: 450),
+                                curve: Curves.elasticOut,
+                                builder: (context, scale, child) => Transform.scale(
+                                  scale: _solved ? scale : 0,
+                                  child: child,
+                                ),
+                                child: Container(
+                                  width: 84,
+                                  height: 84,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.check_rounded,
+                                      color: _primaryTeal, size: 52),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             );
           },
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         if (_errorMessage != null)
           Text(_errorMessage!, style: const TextStyle(color: _errorRed)),
         if (_solved)
           const Text('Solved! 🎉',
               style: TextStyle(color: _primaryTeal, fontWeight: FontWeight.bold, fontSize: 18)),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: _resetPath,
-          style: ElevatedButton.styleFrom(backgroundColor: _primaryTeal),
-          child: const Text('Reset', style: TextStyle(color: Colors.white)),
+        const SizedBox(height: 12),
+        // Clean + Share row, styled after the reference app's pill buttons,
+        // each with a small tap-scale bounce for that "wow" tactile feel.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTapDown: (_) => setState(() => _cleanScale = 0.92),
+              onTapUp: (_) => setState(() => _cleanScale = 1.0),
+              onTapCancel: () => setState(() => _cleanScale = 1.0),
+              onTap: _resetPath,
+              child: AnimatedScale(
+                scale: _cleanScale,
+                duration: const Duration(milliseconds: 100),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _primaryTeal,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.refresh, color: Colors.white, size: 18),
+                      SizedBox(width: 6),
+                      Text('Clean',
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            GestureDetector(
+              onTapDown: (_) => setState(() => _shareScale = 0.92),
+              onTapUp: (_) => setState(() => _shareScale = 1.0),
+              onTapCancel: () => setState(() => _shareScale = 1.0),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Share coming soon!')),
+                );
+              },
+              child: AnimatedScale(
+                scale: _shareScale,
+                duration: const Duration(milliseconds: 100),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF7043), // deep orange - matches reference share button
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.share, color: Colors.white, size: 18),
+                      SizedBox(width: 6),
+                      Text('Share',
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -286,27 +379,25 @@ class _GridPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Solid white board background first.
+    final boardFillPaint = Paint()..color = Colors.white;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), boardFillPaint);
+
+    // Uniform thin grid lines - drawn once per row/column (not per cell)
+    // so every line is the same clean thickness, matching the reference
+    // app's look instead of doubled-up, uneven cell borders.
     final gridLinePaint = Paint()
-      ..color = primaryColor.withOpacity(0.35)
-      ..strokeWidth = 1.5;
+      ..color = primaryColor.withOpacity(0.45)
+      ..strokeWidth = 1.2;
 
-    final outerBorderPaint = Paint()
-      ..color = primaryColor
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-
-    final cellFillPaint = Paint()..color = Colors.white;
-
-    for (int r = 0; r < puzzle.rows; r++) {
-      for (int c = 0; c < puzzle.cols; c++) {
-        final rect = Rect.fromLTWH(c * cellSize, r * cellSize, cellSize, cellSize);
-        canvas.drawRect(rect, cellFillPaint);
-        canvas.drawRect(rect, gridLinePaint);
-      }
+    for (int r = 0; r <= puzzle.rows; r++) {
+      final y = r * cellSize;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridLinePaint);
     }
-
-    // outer border drawn last, on top, so the whole board reads clearly
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), outerBorderPaint);
+    for (int c = 0; c <= puzzle.cols; c++) {
+      final x = c * cellSize;
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridLinePaint);
+    }
 
     if (playerPath.length > 1) {
       final pathPaint = Paint()
