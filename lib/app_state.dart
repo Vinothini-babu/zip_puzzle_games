@@ -27,4 +27,11 @@ class AppState extends ChangeNotifier {
     coins += coinsEarned;
     notifyListeners();
   }
+
+  /// Adds extra coins outside the normal level-completion flow - used for
+  /// the "BONUS X3" reward on the Level Complete screen.
+  void addBonusCoins(int amount) {
+    coins += amount;
+    notifyListeners();
+  }
 }
