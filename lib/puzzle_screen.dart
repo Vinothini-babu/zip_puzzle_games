@@ -104,6 +104,7 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
             padding: const EdgeInsets.all(16),
             child: ZipPuzzleGrid(
               puzzle: _puzzle,
+              levelId: widget.level.id,
               onComplete: _onComplete,
               onReset: () => _resetCount++,
             ),

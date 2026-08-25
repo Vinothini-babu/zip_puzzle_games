@@ -8,15 +8,18 @@
 
 import 'package:flutter/material.dart';
 import 'zip_puzzle_generator.dart';
+import 'share_helper.dart';
 
 class ZipPuzzleGrid extends StatefulWidget {
   final PuzzlePuzzleData puzzle;
   final void Function(bool solved)? onComplete;
   final VoidCallback? onReset;
+  final int levelId;
 
   const ZipPuzzleGrid({
     super.key,
     required this.puzzle,
+    required this.levelId,
     this.onComplete,
     this.onReset,
   });
@@ -319,11 +322,7 @@ class _ZipPuzzleGridState extends State<ZipPuzzleGrid>
               onTapDown: (_) => setState(() => _shareScale = 0.92),
               onTapUp: (_) => setState(() => _shareScale = 1.0),
               onTapCancel: () => setState(() => _shareScale = 1.0),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Share coming soon!')),
-                );
-              },
+              onTap: () => ShareHelper.sharePlaying(levelId: widget.levelId),
               child: AnimatedScale(
                 scale: _shareScale,
                 duration: const Duration(milliseconds: 100),
