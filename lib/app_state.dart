@@ -28,6 +28,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Add to AppState class:
+  bool musicEnabled = true;
+  bool soundEffectsEnabled = true;
+
+  void resetProgress() {
+    coins = 0;
+    completedLevels.clear();
+    notifyListeners();
+  }
+
   /// Adds extra coins outside the normal level-completion flow - used for
   /// the "BONUS X3" reward on the Level Complete screen.
   void addBonusCoins(int amount) {

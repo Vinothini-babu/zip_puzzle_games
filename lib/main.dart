@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'splash_screen.dart';
 import 'level_select_screen.dart';
+import 'iap_service.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  IapService.instance.init();
   runApp(const ZipPuzzleApp());
 }
 

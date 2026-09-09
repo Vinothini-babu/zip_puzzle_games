@@ -12,6 +12,7 @@ import 'puzzle_screen.dart';
 import 'solved_grid_preview.dart';
 import 'zip_puzzle_generator.dart';
 import 'share_helper.dart';
+import 'free_coins_dialog.dart';
 
 class LevelCompleteScreen extends StatefulWidget {
   final LevelData level;
@@ -75,16 +76,56 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen>
     }
   }
 
-  void _collect() {
+  Future<void> _collect() async {
     if (_claimed) return;
     _claimed = true;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        Future.delayed(const Duration(milliseconds: 900), () {
+          if (Navigator.canPop(ctx)) Navigator.pop(ctx);
+        });
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.elasticOut,
+                  builder: (context, value, child) =>
+                      Transform.scale(scale: value, child: child),
+                  child: const Icon(Icons.check_circle_rounded,
+                      color: primaryTeal, size: 56),
+                ),
+                const SizedBox(height: 14),
+                Text('+${widget.coinsEarned} coins collected!',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
     _goNext();
   }
 
-  void _collectBonus() {
+  Future<void> _collectBonus() async {
     if (_claimed) return;
+
+    await showRewardedAd(
+      context,
+      videoAsset: 'assets/videos/bonus_ad.mp4',
+      rewardCoins: widget.coinsEarned * 2, // on top of the base coins already earned = 3x total
+    );
+
     _claimed = true;
-    AppState.instance.addBonusCoins(widget.coinsEarned * 2);
     _goNext();
   }
 

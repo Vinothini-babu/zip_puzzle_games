@@ -9,6 +9,7 @@ import 'app_state.dart';
 import 'level_data.dart';
 import 'puzzle_screen.dart';
 import 'shop_screen.dart';
+import 'free_coins_dialog.dart';
 
 class LevelSelectScreen extends StatefulWidget {
   const LevelSelectScreen({super.key});
@@ -226,16 +227,6 @@ class _BottomBar extends StatelessWidget {
     );
   }
 
-  void _claimFreeCoins(BuildContext context) {
-    // Simple demo reward - simulates a "watch ad" bonus by crediting
-    // coins directly. Swap this for a real rewarded-ad SDK call later.
-    const reward = 20;
-    AppState.instance.addBonusCoins(reward);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('You earned $reward free coins! 🎉')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -256,7 +247,7 @@ class _BottomBar extends StatelessWidget {
               icon: Icons.smart_display,
               label: 'FREE COINS',
               color: const Color(0xFFFFC107),
-              onTap: () => _claimFreeCoins(context),
+              onTap: () => showFreeCoinsAd(context),
             ),
           ),
         ],
