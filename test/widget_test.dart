@@ -13,7 +13,7 @@ import 'package:zip_puzzle_game/main.dart';
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const ZipPuzzleApp());
+    await tester.pumpWidget(const ZipApp());
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);
