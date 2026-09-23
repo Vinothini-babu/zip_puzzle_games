@@ -76,70 +76,77 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [AppColors.orangeLight, AppColors.orangeDark],
-              ),
-            ),
-            child: Container(
-              alignment: Alignment.center,
+      // Horizontal scroll = safety net so this row can never overflow off
+      // the edge of narrow phone screens.
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
-                color: AppColors.cream,
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.orangeLight, AppColors.orangeDark],
+                ),
               ),
-              child: const Text('🐼', style: TextStyle(fontSize: 30)),
-            ),
-          ),
-          const SizedBox(width: 12),
-          if (!gs.premium)
-            GestureDetector(
-              onTap: () => _openShop(context),
               child: Container(
-                width: 42,
-                height: 42,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFFF8A80), AppColors.redDark],
-                  ),
-                  border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                  color: AppColors.cream,
+                  borderRadius: BorderRadius.circular(11),
                 ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Text('ADS', style: AppText.display(12)),
-                    Transform.rotate(
-                      angle: -0.75,
-                      child: Container(width: 38, height: 3, color: Colors.white),
-                    ),
-                  ],
-                ),
+                child: const Text('🐼', style: TextStyle(fontSize: 30)),
               ),
             ),
-          const Spacer(),
-          CoinPill(coins: gs.coins, onAdd: () => _openShop(context)),
-          const SizedBox(width: 10),
-          GameButton(
-            width: 42,
-            height: 38,
-            radius: 12,
-            style: GameButtonStyle.orange,
-            padding: EdgeInsets.zero,
-            onTap: () => showSettingsDialog(context),
-            child: const Icon(Icons.settings_rounded, color: Colors.white, size: 26),
-          ),
-        ],
+            const SizedBox(width: 12),
+            if (!gs.premium)
+              GestureDetector(
+                onTap: () => _openShop(context),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0xFFFF8A80), AppColors.redDark],
+                    ),
+                    border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Text('ADS', style: AppText.display(12)),
+                      Transform.rotate(
+                        angle: -0.75,
+                        child: Container(width: 38, height: 3, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(width: 20),
+            CoinPill(coins: gs.coins, onAdd: () => _openShop(context)),
+            const SizedBox(width: 10),
+            GameButton(
+              width: 42,
+              height: 38,
+              radius: 12,
+              style: GameButtonStyle.orange,
+              padding: EdgeInsets.zero,
+              onTap: () => showSettingsDialog(context),
+              child: const Icon(Icons.settings_rounded, color: Colors.white, size: 26),
+            ),
+          ],
+        ),
       ),
     );
   }
