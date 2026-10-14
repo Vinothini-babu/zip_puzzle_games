@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Needed in RELEASE builds: google_fonts, ads and purchases use the internet.
+         (Flutter only adds this automatically for debug builds.) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
     <application
         android:label="zip_puzzle_game"
         android:name="${applicationName}"
