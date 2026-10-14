@@ -4,13 +4,18 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../game/zip_puzzle_generator.dart';
+import 'stroked_text.dart';
 
-/// The real drag-to-connect board.
+/// Edge key for a wall between two neighbouring cells (order independent).
+int zipEdgeKey(int a, int b) => a < b ? a * 100000 + b : b * 100000 + a;
+
+/// The real drag-to-connect board (real Zip rules).
 /// - Touch checkpoint 1 to start, drag through adjacent cells.
-/// - Every cell must be filled to win.
-/// - Checkpoints must be crossed in order: hitting one out of order
-///   flashes it red and rejects the move (does not extend the path).
-/// - Dragging back onto the previous cell undoes the last step.
+/// - Checkpoints must be crossed in order 1,2,3... (wrong one flashes red).
+/// - You cannot cross your own path or a wall.
+/// - Drag back = undo. Tap/press any cell already on your path = rewind to it.
+/// - Solved only when EVERY cell is filled AND you finish on the LAST number.
+/// - Works with fast finger drags (no skipped cells, no pan-slop delay).
 class ZipPuzzleGrid extends StatefulWidget {
   const ZipPuzzleGrid({
     super.key,
@@ -18,32 +23,40 @@ class ZipPuzzleGrid extends StatefulWidget {
     required this.onSolved,
     this.onWrongMove,
     this.onProgressChanged,
+    this.onStep,
+    this.walls = const <int>{},
   });
 
   final ZipPuzzle puzzle;
 
-  /// Called once the whole board is filled and every checkpoint was
-  /// crossed in order. Passes the player's final path for the replay.
+  /// Optional blocked edges, built with [zipEdgeKey].
+  final Set<int> walls;
+
   final ValueChanged<List<int>> onSolved;
-
-  /// Called whenever the player tries an out-of-order checkpoint.
   final VoidCallback? onWrongMove;
-
   final ValueChanged<List<int>>? onProgressChanged;
+
+  /// Called every time the path grows by one cell (for the tick sound).
+  final VoidCallback? onStep;
 
   @override
   State<ZipPuzzleGrid> createState() => ZipPuzzleGridState();
 }
 
 class ZipPuzzleGridState extends State<ZipPuzzleGrid>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   List<int> _path = [];
   int? _errorCell;
   Timer? _errorTimer;
   bool _solved = false;
 
+  // fast, strong blink (6 half-flashes ~ 1.5s)
   late final AnimationController _solveFlash = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 700));
+      vsync: this, duration: const Duration(milliseconds: 260));
+
+  // "SOLVED!" popup that bounces in
+  late final AnimationController _popup = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 650));
 
   int get n => widget.puzzle.n;
   Map<int, int> get _cp => widget.puzzle.checkpointOf;
@@ -51,6 +64,8 @@ class ZipPuzzleGridState extends State<ZipPuzzleGrid>
   /// Public: used by the Clean button.
   void reset() {
     _errorTimer?.cancel();
+    _solveFlash.value = 0;
+    _popup.value = 0;
     setState(() {
       _path = [];
       _errorCell = null;
@@ -59,9 +74,7 @@ class ZipPuzzleGridState extends State<ZipPuzzleGrid>
     widget.onProgressChanged?.call(_path);
   }
 
-  /// Public: used by the Hint button. Reveals the next cell of the
-  /// generator's own solution, snapping the current path back onto it
-  /// first if the player had wandered off it.
+  /// Public: used by the Hint button.
   void revealNextCell() {
     if (_solved) return;
     final full = widget.puzzle.path;
@@ -96,7 +109,8 @@ class ZipPuzzleGridState extends State<ZipPuzzleGrid>
     widget.onWrongMove?.call();
   }
 
-  void _handleCell(int cell) {
+  // ── pointer down: start on "1", or rewind to a cell already on the path ──
+  void _down(int cell) {
     if (_solved) return;
     if (_path.isEmpty) {
       if (_cp[cell] == 1) {
@@ -105,39 +119,70 @@ class ZipPuzzleGridState extends State<ZipPuzzleGrid>
       }
       return;
     }
+    final idx = _path.indexOf(cell);
+    if (idx >= 0 && idx < _path.length - 1) {
+      setState(() => _path = _path.sublist(0, idx + 1));
+      widget.onProgressChanged?.call(_path);
+    }
+  }
+
+  // ── pointer move: walk towards the finger one cell at a time ──
+  void _move(int target) {
+    if (_solved || _path.isEmpty) return;
+    int guard = 0;
+    while (_path.last != target && guard++ < 4) {
+      final h = _path.last;
+      final dr = target ~/ n - h ~/ n;
+      final dc = target % n - h % n;
+      final next =
+      dr.abs() >= dc.abs() ? h + (dr > 0 ? n : -n) : h + (dc > 0 ? 1 : -1);
+      if (!_step(next)) break;
+    }
+  }
+
+  bool _step(int cell) {
     final last = _path.last;
-    if (cell == last) return;
 
     // drag back = undo last step
     if (_path.length > 1 && cell == _path[_path.length - 2]) {
       setState(() => _path = _path.sublist(0, _path.length - 1));
       widget.onProgressChanged?.call(_path);
-      return;
+      return true;
     }
 
-    if (_path.contains(cell)) return;
-    if (!_adjacent(cell, last)) return;
+    if (_path.contains(cell)) return false;
+    if (!_adjacent(cell, last)) return false;
+    if (widget.walls.contains(zipEdgeKey(cell, last))) {
+      _flashError(cell);
+      return false;
+    }
+
+    final reached = _reachedCheckpoints();
+    // already on the final number -> cannot go further (only undo)
+    if (reached == _cp.length) return false;
 
     final wantCp = _cp[cell];
-    if (wantCp != null) {
-      final nextExpected = _reachedCheckpoints() + 1;
-      if (wantCp != nextExpected) {
-        _flashError(cell);
-        return;
-      }
+    if (wantCp != null && wantCp != reached + 1) {
+      _flashError(cell);
+      return false;
     }
 
     setState(() => _path = [..._path, cell]);
     widget.onProgressChanged?.call(_path);
+    widget.onStep?.call();
     _checkSolved();
+    return true;
   }
 
   void _checkSolved() {
     if (_path.length == n * n && _reachedCheckpoints() == _cp.length) {
       _solved = true;
-      _solveFlash.forward(from: 0);
-      Future.delayed(const Duration(milliseconds: 280), () {
-        if (mounted) widget.onSolved(_path);
+      _popup.forward(from: 0);
+      // blink a few times, then report
+      _solveFlash
+          .repeat(reverse: true, count: 6)
+          .whenCompleteOrCancel(() {
+        if (mounted && _solved) widget.onSolved(_path);
       });
     }
   }
@@ -149,10 +194,55 @@ class ZipPuzzleGridState extends State<ZipPuzzleGrid>
     return row * n + col;
   }
 
+  Widget _solvedPopup(double size) {
+    final t = _popup.value;
+    final scale = Curves.elasticOut.transform(t.clamp(0.0, 1.0).toDouble());
+    final opacity = (t * 3).clamp(0.0, 1.0).toDouble();
+    return Opacity(
+      opacity: opacity,
+      child: Transform.scale(
+        scale: scale,
+        child: Container(
+          padding: EdgeInsets.symmetric(
+              horizontal: size * 0.08, vertical: size * 0.045),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(size * 0.07),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF9BE564), AppColors.green],
+            ),
+            border: Border.all(color: Colors.white, width: 4),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8)),
+              BoxShadow(
+                  color: const Color(0xFFFFD54F).withOpacity(0.8),
+                  blurRadius: 30,
+                  spreadRadius: 2),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_rounded,
+                  color: Colors.white, size: size * 0.14),
+              StrokedText('SOLVED!',
+                  size: size * 0.10, stroke: AppColors.greenDark),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _errorTimer?.cancel();
     _solveFlash.dispose();
+    _popup.dispose();
     super.dispose();
   }
 
@@ -164,21 +254,34 @@ class ZipPuzzleGridState extends State<ZipPuzzleGrid>
         child: SizedBox(
           width: size,
           height: size,
-          child: GestureDetector(
+          // Listener (not GestureDetector) => reacts instantly, no pan slop.
+          child: Listener(
             behavior: HitTestBehavior.opaque,
-            onPanStart: (d) => _handleCell(_cellFromLocal(d.localPosition, size)),
-            onPanUpdate: (d) => _handleCell(_cellFromLocal(d.localPosition, size)),
+            onPointerDown: (e) => _down(_cellFromLocal(e.localPosition, size)),
+            onPointerMove: (e) => _move(_cellFromLocal(e.localPosition, size)),
             child: AnimatedBuilder(
-              animation: _solveFlash,
-              builder: (context, _) => CustomPaint(
-                painter: _GridPainter(
-                  n: n,
-                  path: _path,
-                  checkpoints: _cp,
-                  errorCell: _errorCell,
-                  solveFlash: _solveFlash.value,
-                ),
-                size: Size(size, size),
+              animation: Listenable.merge([_solveFlash, _popup]),
+              builder: (context, _) => Stack(
+                alignment: Alignment.center,
+                children: [
+                  // board "pulses" slightly while blinking
+                  Transform.scale(
+                    scale: 1 + 0.05 * _solveFlash.value,
+                    child: CustomPaint(
+                      painter: _GridPainter(
+                        n: n,
+                        path: _path,
+                        checkpoints: _cp,
+                        walls: widget.walls,
+                        errorCell: _errorCell,
+                        solveFlash: _solveFlash.value,
+                      ),
+                      size: Size(size, size),
+                    ),
+                  ),
+                  if (_solved)
+                    IgnorePointer(child: _solvedPopup(size)),
+                ],
               ),
             ),
           ),
@@ -193,6 +296,7 @@ class _GridPainter extends CustomPainter {
     required this.n,
     required this.path,
     required this.checkpoints,
+    required this.walls,
     required this.errorCell,
     required this.solveFlash,
   });
@@ -200,6 +304,7 @@ class _GridPainter extends CustomPainter {
   final int n;
   final List<int> path;
   final Map<int, int> checkpoints;
+  final Set<int> walls;
   final int? errorCell;
   final double solveFlash;
 
@@ -227,18 +332,40 @@ class _GridPainter extends CustomPainter {
           Radius.circular(cellSize * 0.16),
         );
         canvas.drawRRect(rect, cellPaint);
+        if (solveFlash > 0) {
+          canvas.drawRRect(
+              rect,
+              Paint()
+                ..color =
+                const Color(0xFFFFD54F).withOpacity(0.55 * solveFlash));
+        }
         canvas.drawRRect(rect, cellBorder);
       }
     }
 
     // player's path
     if (path.length > 1) {
-      final p = Path()..moveTo(_center(path.first, cellSize).dx, _center(path.first, cellSize).dy);
+      final p = Path()
+        ..moveTo(_center(path.first, cellSize).dx,
+            _center(path.first, cellSize).dy);
       for (final cell in path.skip(1)) {
         final o = _center(cell, cellSize);
         p.lineTo(o.dx, o.dy);
       }
-      final glow = Color.lerp(AppColors.teal, Colors.white, solveFlash * 0.6)!;
+      final glow =
+      Color.lerp(AppColors.teal, const Color(0xFFFFC107), solveFlash)!;
+      if (solveFlash > 0) {
+        canvas.drawPath(
+          p,
+          Paint()
+            ..color = const Color(0xFFFFE082).withOpacity(0.9 * solveFlash)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = cellSize * 0.62
+            ..strokeCap = StrokeCap.round
+            ..strokeJoin = StrokeJoin.round
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, cellSize * 0.22),
+        );
+      }
       canvas.drawPath(
         p,
         Paint()
@@ -254,6 +381,26 @@ class _GridPainter extends CustomPainter {
           Paint()..color = AppColors.tealDark);
     }
 
+    // walls (thick bars on the edge between two cells)
+    if (walls.isNotEmpty) {
+      final wallPaint = Paint()
+        ..color = AppColors.brownDark
+        ..strokeWidth = (cellSize * 0.10).clamp(2.5, 7.0)
+        ..strokeCap = StrokeCap.round;
+      for (final key in walls) {
+        final a = key ~/ 100000, b = key % 100000;
+        if (b == a + 1 && a ~/ n == b ~/ n) {
+          final x = (b % n) * cellSize;
+          final y = (a ~/ n) * cellSize;
+          canvas.drawLine(Offset(x, y + gap), Offset(x, y + cellSize - gap), wallPaint);
+        } else {
+          final x = (a % n) * cellSize;
+          final y = (b ~/ n) * cellSize;
+          canvas.drawLine(Offset(x + gap, y), Offset(x + cellSize - gap, y), wallPaint);
+        }
+      }
+    }
+
     // checkpoints
     final reached = path.where((c) => checkpoints.containsKey(c)).length;
     checkpoints.forEach((cell, number) {
@@ -263,8 +410,8 @@ class _GridPainter extends CustomPainter {
       final fill = isError
           ? AppColors.red
           : (isReached ? AppColors.tealDark : AppColors.orange);
-      canvas.drawCircle(o, cellSize * 0.30,
-          Paint()..color = Colors.black.withOpacity(0.12));
+      canvas.drawCircle(
+          o, cellSize * 0.30, Paint()..color = Colors.black.withOpacity(0.12));
       canvas.drawCircle(o, cellSize * 0.28, Paint()..color = fill);
       canvas.drawCircle(
           o,
@@ -278,7 +425,7 @@ class _GridPainter extends CustomPainter {
           text: '$number',
           style: TextStyle(
               color: Colors.white,
-              fontSize: cellSize * 0.32,
+              fontSize: cellSize * (number > 9 ? 0.26 : 0.32),
               fontWeight: FontWeight.w800),
         ),
         textDirection: TextDirection.ltr,
@@ -288,6 +435,5 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _GridPainter old) =>
-      old.path != path || old.errorCell != errorCell || old.solveFlash != solveFlash;
+  bool shouldRepaint(covariant _GridPainter old) => true;
 }

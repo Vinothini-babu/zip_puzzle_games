@@ -1,21 +1,28 @@
 import 'dart:math';
 
 /// A generated Zip-style puzzle: a full Hamiltonian path over an n x n grid,
-/// with a handful of cells along that path marked as numbered checkpoints.
-/// The player must reproduce a path that fills every cell and crosses the
-/// checkpoints in order 1, 2, 3 ...
+/// with cells along that path marked as numbered checkpoints (and optional
+/// walls). The player must fill every cell and cross the checkpoints in
+/// order 1, 2, 3 ... finishing on the last number.
 class ZipPuzzle {
-  const ZipPuzzle({required this.n, required this.path, required this.checkpointOf});
+  const ZipPuzzle({
+    required this.n,
+    required this.path,
+    required this.checkpointOf,
+    this.walls = const <int>{},
+  });
 
   final int n;
 
-  /// The generator's own solution, as a sequence of cell indices
-  /// (index = row * n + col). Not shown to the player — only used to
-  /// place checkpoints and to power the Hint button.
+  /// The generator's own solution (index = row * n + col). Only used to
+  /// place checkpoints/walls and to power the Hint button.
   final List<int> path;
 
   /// cellIndex -> checkpoint number (1-based).
   final Map<int, int> checkpointOf;
+
+  /// Blocked edges between neighbouring cells. Key = smaller*100000 + larger.
+  final Set<int> walls;
 
   int get totalCells => n * n;
   int get totalCheckpoints => checkpointOf.length;
@@ -24,59 +31,141 @@ class ZipPuzzle {
   static int col(int cell, int n) => cell % n;
 }
 
-/// NOTE: an earlier version of this file used randomised backtracking to
-/// search for a Hamiltonian path. On some devices/seeds that search could
-/// take several seconds (even longer in debug builds), which froze the
-/// puzzle screen right when it opened — that was the "black / frozen
-/// screen" bug. This version builds a valid Hamiltonian path directly
-/// (a boustrophedon / "snake" sweep with a randomised orientation), so
-/// puzzle generation is always instant, with no search involved.
+/// Builds a real, random-looking Zip puzzle.
+///
+/// The old version used a snake sweep, so every puzzle was the same
+/// zig-zag. This version shuffles the snake with "backbite" moves, which
+/// keeps the path a valid Hamiltonian path but makes it twist like a real
+/// Zip puzzle. It is instant, even on 16x16 (no search / no freezing).
+/// Same seed => same puzzle, so a level is always the same.
 class ZipPuzzleGenerator {
   const ZipPuzzleGenerator._();
 
-  static ZipPuzzle generate(int n, {int? checkpointCount, int? seed}) {
+  static ZipPuzzle generate(
+      int n, {
+        int? checkpointCount,
+        int? wallCount,
+        int? seed,
+      }) {
     final rnd = Random(seed);
-    final path = _generateSnakePath(n, rnd);
-    final count = (checkpointCount ?? _defaultCheckpointCount(n))
-        .clamp(2, path.length);
-    final checkpointOf = _pickCheckpoints(path, count);
-    return ZipPuzzle(n: n, path: path, checkpointOf: checkpointOf);
+    final path = _randomHamiltonianPath(n, rnd);
+    final int count = (checkpointCount ?? _defaultCheckpointCount(n))
+        .clamp(2, max(2, path.length ~/ 2))
+        .toInt();
+    final checkpointOf = _pickCheckpoints(path, count, rnd);
+    final walls = _pickWalls(path, n, wallCount ?? _defaultWallCount(n), rnd);
+    return ZipPuzzle(
+        n: n, path: path, checkpointOf: checkpointOf, walls: walls);
   }
 
-  static int _defaultCheckpointCount(int n) => n.clamp(3, 6);
+  // 4x4 -> 3, 6x6 -> 5, 10x10 -> 12, 16x16 -> 16
+  static int _defaultCheckpointCount(int n) =>
+      ((n * n) / 8).round().clamp(3, 16).toInt();
 
-  /// Always-valid, always-instant Hamiltonian path: sweep the grid row by
-  /// row (or column by column), alternating direction each line, like
-  /// mowing a lawn. The 3 random flags below just change the starting
-  /// corner / axis so puzzles don't all look identical.
-  static List<int> _generateSnakePath(int n, Random rnd) {
-    final rowMajor = rnd.nextBool();
-    final reverseOuter = rnd.nextBool();
-    final startFlipped = rnd.nextBool();
+  // easy (<=10): no walls, medium: a few, hard (16): more
+  static int _defaultWallCount(int n) {
+    if (n <= 10) return 0;
+    if (n < 16) return (n * n * 0.04).round();
+    return (n * n * 0.07).round();
+  }
 
+  static List<int> _randomHamiltonianPath(int n, Random rnd) {
+    final total = n * n;
     final path = <int>[];
-    final outerIndices = List<int>.generate(n, (i) => i);
-    final outerOrder = reverseOuter ? outerIndices.reversed.toList() : outerIndices;
-
-    for (int oi = 0; oi < n; oi++) {
-      final o = outerOrder[oi];
-      final flipThisLine = startFlipped ? oi.isEven : oi.isOdd;
-      final innerIndices = List<int>.generate(n, (i) => i);
-      final innerOrder = flipThisLine ? innerIndices.reversed.toList() : innerIndices;
-      for (final ii in innerOrder) {
-        path.add(rowMajor ? (o * n + ii) : (ii * n + o));
+    for (var r = 0; r < n; r++) {
+      if (r.isEven) {
+        for (var c = 0; c < n; c++) {
+          path.add(r * n + c);
+        }
+      } else {
+        for (var c = n - 1; c >= 0; c--) {
+          path.add(r * n + c);
+        }
       }
     }
+    final pos = List<int>.filled(total, 0);
+    for (var i = 0; i < total; i++) {
+      pos[path[i]] = i;
+    }
+
+    void reverse(int a, int b) {
+      var i = a, j = b;
+      while (i < j) {
+        final t = path[i];
+        path[i] = path[j];
+        path[j] = t;
+        i++;
+        j--;
+      }
+      for (var x = a; x <= b; x++) {
+        pos[path[x]] = x;
+      }
+    }
+
+    List<int> neighbours(int c) {
+      final r = c ~/ n, col = c % n;
+      return [
+        if (r > 0) c - n,
+        if (r < n - 1) c + n,
+        if (col > 0) c - 1,
+        if (col < n - 1) c + 1,
+      ];
+    }
+
+    for (var it = 0; it < total * 60; it++) {
+      final atHead = rnd.nextBool();
+      final end = atHead ? path.first : path.last;
+      final nb = neighbours(end);
+      final v = nb[rnd.nextInt(nb.length)];
+      final k = pos[v];
+      if (atHead) {
+        if (k <= 1) continue;
+        reverse(0, k - 1);
+      } else {
+        if (k >= total - 2) continue;
+        reverse(k + 1, total - 1);
+      }
+    }
+    if (rnd.nextBool()) reverse(0, total - 1);
     return path;
   }
 
-  static Map<int, int> _pickCheckpoints(List<int> path, int count) {
-    final map = <int, int>{};
-    for (int i = 0; i < count; i++) {
-      final t = count == 1 ? 0.0 : i / (count - 1);
-      final idx = (t * (path.length - 1)).round();
-      map[path[idx]] = i + 1;
+  /// Checkpoints spread along the path with a little jitter.
+  /// 1 = path start, last number = path end.
+  static Map<int, int> _pickCheckpoints(List<int> path, int count, Random rnd) {
+    final total = path.length;
+    final idx = <int>{0, total - 1};
+    final seg = (total - 1) / (count - 1);
+    for (var i = 1; i < count - 1; i++) {
+      final lo = (i * seg - seg / 3).round();
+      final hi = (i * seg + seg / 3).round();
+      final p = lo + rnd.nextInt(max(1, hi - lo + 1));
+      idx.add(p.clamp(1, total - 2).toInt());
     }
-    return map;
+    final sorted = idx.toList()..sort();
+    return {for (var i = 0; i < sorted.length; i++) path[sorted[i]]: i + 1};
+  }
+
+  /// Walls only on edges the solution does NOT use, so it stays solvable.
+  static Set<int> _pickWalls(List<int> path, int n, int count, Random rnd) {
+    if (count <= 0) return const <int>{};
+    final pos = List<int>.filled(n * n, 0);
+    for (var i = 0; i < path.length; i++) {
+      pos[path[i]] = i;
+    }
+    final cand = <int>[];
+    for (var r = 0; r < n; r++) {
+      for (var c = 0; c < n; c++) {
+        final a = r * n + c;
+        if (c + 1 < n && (pos[a] - pos[a + 1]).abs() != 1) {
+          cand.add(a * 100000 + a + 1);
+        }
+        if (r + 1 < n && (pos[a] - pos[a + n]).abs() != 1) {
+          cand.add(a * 100000 + a + n);
+        }
+      }
+    }
+    cand.shuffle(rnd);
+    return cand.take(count).toSet();
   }
 }

@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
@@ -13,9 +16,22 @@ Future<T?> showCartoonDialog<T>(
     context: context,
     barrierDismissible: dismissible,
     barrierLabel: 'dialog',
-    barrierColor: Colors.black.withOpacity(0.68),
+    barrierColor: Colors.black.withOpacity(0.35),
     transitionDuration: const Duration(milliseconds: 260),
-    pageBuilder: (ctx, _, __) => builder(ctx),
+    // Blurring the whole screen behind the dialog makes it feel like it
+    // properly covers/owns the screen, instead of just a small card
+    // floating over a slightly-dimmed board.
+    pageBuilder: (ctx, _, __) => Stack(
+      children: [
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+            child: const SizedBox.expand(),
+          ),
+        ),
+        builder(ctx),
+      ],
+    ),
     transitionBuilder: (ctx, anim, _, child) => FadeTransition(
       opacity: anim,
       child: ScaleTransition(
@@ -36,7 +52,7 @@ class CartoonDialog extends StatelessWidget {
     this.below,
     this.ribbon = AppColors.red,
     this.ribbonDark = AppColors.redDark,
-    this.maxWidth = 340,
+    this.maxWidth = 480,
   });
 
   final String title;
@@ -49,13 +65,18 @@ class CartoonDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Explicit width from MediaQuery — guaranteed to fill the screen
+    // (minus a small margin) instead of relying on the surrounding
+    // scroll view / flex to stretch it, which isn't reliable everywhere.
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final cardWidth = math.min(screenWidth - 20, maxWidth);
     return Material(
       type: MaterialType.transparency,
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+          child: SizedBox(
+            width: cardWidth,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -116,6 +137,10 @@ class CartoonDialog extends StatelessWidget {
 
   Widget _panel() {
     return Container(
+      // width: double.infinity — without this, the panel shrink-wraps to
+      // fit only its text content and sits at the top-left of the Stack,
+      // which is exactly the "card is off to one side" bug.
+      width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 28, 10, 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),

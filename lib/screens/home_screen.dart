@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/game_state.dart';
 import '../core/routes.dart';
+import '../widgets/avatar_picker_dialog.dart';
 import '../widgets/coin_pill.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/flower_background.dart';
@@ -84,25 +85,48 @@ class _TopBar extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 54,
-              height: 54,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(14),
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [AppColors.orangeLight, AppColors.orangeDark],
-                ),
-              ),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.cream,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: const Text('🐼', style: TextStyle(fontSize: 30)),
+            GestureDetector(
+              onTap: () => showAvatarPickerDialog(context),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 54,
+                    height: 54,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [AppColors.orangeLight, AppColors.orangeDark],
+                      ),
+                    ),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.cream,
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Text(gs.avatarEmoji, style: const TextStyle(fontSize: 30)),
+                    ),
+                  ),
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.purple,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: const Icon(Icons.edit_rounded, size: 11, color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 12),
@@ -207,7 +231,7 @@ class _LevelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final n = 4 + GameState.chapterOf(level);
+    final n = GameState.gridSizeForLevel(level);
     return SizedBox(
       width: width,
       height: height,
@@ -234,7 +258,7 @@ class _LevelCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.fromLTRB(14, 26, 14, 30),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF6E7D4),
+                  color: AppColors.cream,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Column(
@@ -384,7 +408,7 @@ class _BottomNav extends StatelessWidget {
             ],
           ),
         ),
-        Container(height: 14 + bottom, color: const Color(0xFF7A3A2E)),
+        Container(height: 14 + bottom, color: AppColors.bgDark),
       ],
     );
   }
@@ -419,7 +443,7 @@ class _NavTab extends StatelessWidget {
           children: [
             Icon(icon,
                 size: selected ? 36 : 30,
-                color: selected ? const Color(0xFFE8683B) : AppColors.orangeDark),
+                color: selected ? AppColors.orangeDark : AppColors.orangeDark.withOpacity(0.7)),
             if (label != null)
               StrokedText(label!, size: 14, stroke: AppColors.orangeDark, dropShadow: 1.5),
           ],

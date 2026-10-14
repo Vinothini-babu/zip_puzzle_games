@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
 import '../core/game_state.dart';
+import '../core/sound_service.dart';
 import '../widgets/game_button.dart';
 import '../widgets/solved_grid_preview.dart';
 import '../widgets/stroked_text.dart';
@@ -32,10 +34,10 @@ class _RealBoardState extends State<RealBoard> {
   @override
   void initState() {
     super.initState();
-    final n = 4 + GameState.chapterOf(widget.level);
-    final cpCount = (3 + GameState.chapterOf(widget.level)).clamp(3, 6);
-    _puzzle = ZipPuzzleGenerator.generate(n,
-        checkpointCount: cpCount, seed: widget.level * 7919 + 13);
+    final n = GameState.gridSizeForLevel(widget.level);
+    // Checkpoint count + walls are now chosen by the generator from the grid
+    // size (real Zip has many more numbers on big boards).
+    _puzzle = ZipPuzzleGenerator.generate(n, seed: widget.level * 7919 + 13);
     widget.controller.showHint = () => _gridKey.currentState?.revealNextCell();
   }
 
@@ -47,7 +49,15 @@ class _RealBoardState extends State<RealBoard> {
           child: ZipPuzzleGrid(
             key: _gridKey,
             puzzle: _puzzle,
+            walls: _puzzle.walls,
+            onStep: SoundService.playStep,
+            onWrongMove: () {
+              if (GameState.instance.vibration) HapticFeedback.mediumImpact();
+              SoundService.playWrong();
+            },
             onSolved: (path) {
+              if (GameState.instance.vibration) HapticFeedback.heavyImpact();
+              SoundService.playWin(); // checks the sound setting itself
               widget.controller.solvedPreviewBuilder = (_) => SolvedGridPreview(
                 n: _puzzle.n,
                 path: path,

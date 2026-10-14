@@ -8,7 +8,7 @@ class ZipLogo extends StatelessWidget {
   const ZipLogo({super.key, this.scale = 1});
   final double scale;
 
-  static const _outline = Color(0xFF8A3A16);
+  static const _outline = AppColors.brownDark;
 
   @override
   Widget build(BuildContext context) {

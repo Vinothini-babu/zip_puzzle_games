@@ -13,18 +13,16 @@ import 'shop_screen.dart';
 class LevelsScreen extends StatelessWidget {
   const LevelsScreen({super.key});
 
-  static const _names = ['EASY', 'MEDIUM', 'HARD'];
-  static const _ribbon = [
-    [AppColors.green, AppColors.greenDark],
-    [AppColors.orange, AppColors.orangeDark],
-    [AppColors.red, AppColors.redDark],
-  ];
+  static const _ribbonByLabel = {
+    'EASY': [AppColors.green, AppColors.greenDark],
+    'MEDIUM': [AppColors.orange, AppColors.orangeDark],
+    'HARD': [AppColors.red, AppColors.redDark],
+  };
 
   @override
   Widget build(BuildContext context) {
     final gs = GameState.instance;
-    const per = AppInfo.levelsPerChapter;
-    final chapters = (AppInfo.maxLevel / per).ceil();
+    const per = GameState.levelsPerChapter;
 
     return Scaffold(
       body: FlowerBackground(
@@ -60,14 +58,22 @@ class LevelsScreen extends StatelessWidget {
                 ),
                 Expanded(
                   child: LayoutBuilder(builder: (context, cons) {
-                    final tile = (cons.maxWidth - 32 - 12 * (per - 1)) / per;
+                    // one chapter = one row, so columns == levels per chapter
+                    final tile =
+                    ((cons.maxWidth - 32 - 12 * (per - 1)) / per)
+                        .floorToDouble();
+                    // itemCount is left unbounded (null) — levels are
+                    // endless, so chapters are built lazily as the
+                    // player scrolls down, forever.
                     return ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                      itemCount: chapters,
-                      itemBuilder: (context, c) {
-                        final colors = _ribbon[c.clamp(0, 2) as int];
-                        final first = c * per + 1;
-                        final last = (first + per - 1).clamp(1, AppInfo.maxLevel) as int;
+                      itemBuilder: (context, chapterIndex) {
+                        final first = chapterIndex * per + 1;
+                        final last = first + per - 1;
+                        final label = GameState.difficultyOf(first);
+                        final colors = _ribbonByLabel[label]!;
+                        final nFirst = GameState.gridSizeForLevel(first);
+                        final nLast = GameState.gridSizeForLevel(last);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 22),
                           child: Column(
@@ -85,13 +91,15 @@ class LevelsScreen extends StatelessWidget {
                                         offset: const Offset(0, 4)),
                                   ],
                                 ),
-                                child: StrokedText(_names[c.clamp(0, 2) as int],
-                                    size: 18, stroke: colors[1]),
+                                child: StrokedText(
+                                    '$label  (${nFirst}x$nFirst'
+                                        '${nFirst == nLast ? '' : '-${nLast}x$nLast'})',
+                                    size: 16, stroke: colors[1]),
                               ),
                               const SizedBox(height: 16),
-                              Wrap(
-                                spacing: 12,
-                                runSpacing: 14,
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
                                 children: [
                                   for (int l = first; l <= last; l++)
                                     _LevelTile(level: l, size: tile, gs: gs),

@@ -7,6 +7,7 @@ import '../core/app_theme.dart';
 import '../core/game_state.dart';
 import '../core/routes.dart';
 import '../widgets/cartoon_dialog.dart';
+import '../widgets/coin_burst.dart';
 import '../widgets/coin_pill.dart';
 import '../widgets/flower_background.dart';
 import '../widgets/game_button.dart';
@@ -47,6 +48,8 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen>
       vsync: this, duration: const Duration(milliseconds: 1300))
     ..repeat(reverse: true);
   bool _busy = false;
+  final _collectKey = GlobalKey();
+  final _bonusKey = GlobalKey();
 
   @override
   void initState() {
@@ -72,9 +75,13 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen>
         context, fadeRoute(const HomeScreen()), (r) => false);
   }
 
-  void _collect() {
+  void _collect() async {
     if (_busy) return;
     _busy = true;
+    // coins fly up from the button before the coins actually land in
+    // the balance — the classic "collected!" feel from real games.
+    await playCoinBurst(context, originKey: _collectKey);
+    if (!mounted) return;
     GameState.instance.addCoins(widget.baseReward);
     _goHome();
   }
@@ -87,6 +94,8 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen>
     final ok = await AdService.showRewarded();
     if (!mounted) return;
     if (ok) {
+      await playCoinBurst(context, originKey: _bonusKey);
+      if (!mounted) return;
       GameState.instance.addCoins(amount);
       _goHome();
     } else {
@@ -124,7 +133,7 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen>
                         StrokedText('COMPLETED',
                             size: 50,
                             fill: AppColors.orangeLight,
-                            stroke: const Color(0xFF8A3A16),
+                            stroke: AppColors.brownDark,
                             height: 1.05),
                       ],
                     ),
@@ -205,6 +214,7 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen>
         children: [
           Expanded(
             child: GameButton(
+              key: _collectKey,
               width: double.infinity,
               height: 58,
               onTap: _collect,
@@ -222,6 +232,7 @@ class _LevelCompleteScreenState extends State<LevelCompleteScreen>
           const SizedBox(width: 14),
           Expanded(
             child: GameButton(
+              key: _bonusKey,
               width: double.infinity,
               height: 58,
               style: GameButtonStyle.purple,
@@ -289,7 +300,7 @@ class _Hoop extends StatelessWidget {
           padding: EdgeInsets.all(size * 0.15),
           decoration: const BoxDecoration(
             shape: BoxShape.circle,
-            color: Color(0xFFFBF3E6),
+            color: AppColors.cream,
           ),
           child: child,
         ),
@@ -306,7 +317,7 @@ class _StitchPainter extends CustomPainter {
     final r = size.width / 2 - 8;
     final path = Path()..addOval(Rect.fromCircle(center: size.center(Offset.zero), radius: r));
     final paint = Paint()
-      ..color = const Color(0xFFD9C7A8)
+      ..color = const Color(0xFFD8CCF2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     for (final m in path.computeMetrics()) {

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
 import '../core/game_state.dart';
+import '../core/sound_service.dart';
 import 'cartoon_dialog.dart';
 import 'coin_pill.dart';
 import 'game_button.dart';
@@ -286,13 +288,20 @@ Future<void> showSettingsDialog(BuildContext context) {
                 label: 'SOUND',
                 icon: Icons.volume_up_rounded,
                 value: gs.sound,
-                onChanged: gs.setSound),
+                onChanged: (v) {
+                  gs.setSound(v);
+                  // instant proof the toggle actually does something
+                  if (v) SoundService.playClick();
+                }),
             const SizedBox(height: 10),
             _ToggleRow(
                 label: 'VIBRATION',
                 icon: Icons.vibration_rounded,
                 value: gs.vibration,
-                onChanged: gs.setVibration),
+                onChanged: (v) {
+                  gs.setVibration(v);
+                  if (v) HapticFeedback.mediumImpact();
+                }),
             const SizedBox(height: 14),
             Text('${AppInfo.gameName}  v${AppInfo.version}',
                 style: AppText.display(12, color: AppColors.brown.withOpacity(0.7))),

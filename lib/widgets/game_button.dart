@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
+import '../core/game_state.dart';
+import '../core/sound_service.dart';
 
 enum GameButtonStyle { green, red, purple, orange, grey }
 
@@ -65,10 +68,16 @@ class _GameButtonState extends State<GameButton> {
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+      onTapDown: enabled
+          ? (_) {
+        setState(() => _down = true);
+        if (GameState.instance.vibration) HapticFeedback.lightImpact();
+      }
+          : null,
       onTapUp: enabled
           ? (_) {
         setState(() => _down = false);
+        if (GameState.instance.sound) SoundService.playClick();
         widget.onTap!();
       }
           : null,

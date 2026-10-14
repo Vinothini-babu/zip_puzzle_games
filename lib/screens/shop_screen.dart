@@ -3,31 +3,63 @@ import 'package:flutter/material.dart';
 import '../core/ad_service.dart';
 import '../core/app_theme.dart';
 import '../core/game_state.dart';
+import '../core/upi_payment.dart';
 import '../widgets/coin_pill.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/flower_background.dart';
 import '../widgets/game_button.dart';
 import '../widgets/stroked_text.dart';
 
-/// Demo shop: purchases credit instantly. Replace _buy* with in_app_purchase.
+/// Buy buttons open a real UPI payment intent (GPay/PhonePe/etc). See
+/// core/upi_payment.dart for what still needs a backend before this can
+/// safely handle real money.
 class ShopScreen extends StatelessWidget {
   const ShopScreen({super.key});
 
-  static const List<(int, String, String?)> _packs = [
-    (500, '₹79', null),
-    (1200, '₹149', 'POPULAR'),
-    (3000, '₹349', 'BEST VALUE'),
-    (7500, '₹799', null),
+  static const List<(int, String, num, String?)> _packs = [
+    (500, '₹79', 79, null),
+    (1200, '₹149', 149, 'POPULAR'),
+    (3000, '₹349', 349, 'BEST VALUE'),
+    (7500, '₹799', 799, null),
   ];
 
-  Future<void> _buyCoins(BuildContext context, int coins) async {
-    GameState.instance.addCoins(coins); // TODO: real purchase flow
-    await showMessageDialog(context,
-        title: 'YAY!', message: 'You got $coins coins!');
+  Future<void> _buyCoins(BuildContext context, int coins, num rupees) async {
+    final opened = await UpiPayment.launch(
+        amountRupees: rupees, note: '$coins coins - ${AppInfo.gameName}');
+    if (!context.mounted) return;
+    if (!opened) {
+      // No UPI app found (very common on an emulator) — fall back to a
+      // demo credit so testing isn't blocked.
+      GameState.instance.addCoins(coins);
+      await showMessageDialog(context,
+          title: 'NO UPI APP FOUND',
+          message: 'Credited $coins coins for testing instead.',
+          ribbon: AppColors.purple,
+          ribbonDark: AppColors.purpleDark);
+      return;
+    }
+    // We opened GPay/PhonePe for real, but without a backend we can't
+    // verify the payment actually completed — see the warning in
+    // core/upi_payment.dart before using this for real money.
+    GameState.instance.addCoins(coins);
+    await showMessageDialog(context, title: 'YAY!', message: 'You got $coins coins!');
   }
 
   Future<void> _buyPremium(BuildContext context) async {
-    GameState.instance.buyPremium(); // TODO: real purchase flow
+    final opened = await UpiPayment.launch(
+        amountRupees: 1150, note: 'Premium - ${AppInfo.gameName}');
+    if (!context.mounted) return;
+    if (!opened) {
+      GameState.instance.buyPremium();
+      GameState.instance.addCoins(500);
+      await showMessageDialog(context,
+          title: 'NO UPI APP FOUND',
+          message: 'Activated Premium for testing instead.',
+          ribbon: AppColors.purple,
+          ribbonDark: AppColors.purpleDark);
+      return;
+    }
+    GameState.instance.buyPremium();
     GameState.instance.addCoins(500);
     await showMessageDialog(context,
         title: 'PREMIUM ON', message: 'No ads, unlimited moves and 500 coins!');
@@ -114,11 +146,11 @@ class ShopScreen extends StatelessWidget {
                       ),
                       for (final p in _packs) ...[
                         const SizedBox(height: 16),
-                        _packCard(context, p.$1, p.$2, p.$3),
+                        _packCard(context, p.$1, p.$2, p.$3, p.$4),
                       ],
                       const SizedBox(height: 18),
                       Center(
-                        child: Text('Demo purchases – connect in_app_purchase before release',
+                        child: Text('Opens GPay/PhonePe for payment — see upi_payment.dart',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 color: Colors.white.withOpacity(0.4), fontSize: 11)),
@@ -147,7 +179,7 @@ class ShopScreen extends StatelessWidget {
     );
   }
 
-  Widget _packCard(BuildContext context, int coins, String price, String? tag) {
+  Widget _packCard(BuildContext context, int coins, String price, num rupees, String? tag) {
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -166,7 +198,7 @@ class ShopScreen extends StatelessWidget {
                 width: 100,
                 height: 46,
                 radius: 14,
-                onTap: () => _buyCoins(context, coins),
+                onTap: () => _buyCoins(context, coins, rupees),
                 child: StrokedText(price, size: 20, stroke: AppColors.greenDark),
               ),
             ],

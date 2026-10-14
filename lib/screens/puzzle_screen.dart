@@ -88,13 +88,13 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
     _timer?.cancel();
     final reward = _computeReward();
     final preview = _ctrl.solvedPreviewBuilder?.call(context) ??
-        MiniBoardPreview(n: 4 + GameState.chapterOf(widget.level));
+        MiniBoardPreview(n: GameState.gridSizeForLevel(widget.level));
     // small delay so your blink-on-solve animation can play
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
-        fadeRoute(LevelCompleteScreen(
+        popupRoute(LevelCompleteScreen(
             level: widget.level, baseReward: reward, preview: preview)),
       );
     });
@@ -289,13 +289,15 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
 
   Widget _boardArea() {
     return LayoutBuilder(builder: (context, cons) {
-      final side = math.max(120.0, math.min(cons.maxWidth - 28, cons.maxHeight - 12));
+      // Use nearly all the available space — a bigger board reads much
+      // better than one with lots of empty margin around it.
+      final side = math.max(140.0, math.min(cons.maxWidth - 12, cons.maxHeight - 4));
       _board ??= buildBoardForLevel(context, widget.level, _ctrl);
       return Center(
         child: Container(
           width: side,
           height: side,
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(26),
             gradient: const LinearGradient(
@@ -311,9 +313,9 @@ class _PuzzleScreenState extends State<PuzzleScreen> {
             ],
           ),
           child: Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              color: const Color(0xFFF6E7D4),
+              color: AppColors.cream,
               borderRadius: BorderRadius.circular(18),
             ),
             child: KeyedSubtree(key: ValueKey(_boardKey), child: _board!),

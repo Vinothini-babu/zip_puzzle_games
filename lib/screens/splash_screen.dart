@@ -61,7 +61,13 @@ class _SplashScreenState extends State<SplashScreen>
   Widget _studioSplash() {
     return Container(
       key: const ValueKey('studio'),
-      color: const Color(0xFF00C566),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.bgGlow, AppColors.bgMid, AppColors.bgDark],
+        ),
+      ),
       alignment: Alignment.center,
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0, end: 1),
@@ -70,12 +76,26 @@ class _SplashScreenState extends State<SplashScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(AppInfo.studioName,
+            Container(
+              width: 78,
+              height: 78,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.orangeLight, AppColors.orangeDark],
+                ),
+              ),
+              child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 46),
+            ),
+            const SizedBox(height: 18),
+            Text('GET READY TO',
                 textAlign: TextAlign.center,
-                style: AppText.display(38, color: Colors.white.withOpacity(0.45))),
-            const SizedBox(height: 14),
-            Text('PRESENTS',
-                style: AppText.display(18, color: Colors.white.withOpacity(0.45))),
+                style: AppText.display(16, color: Colors.white.withOpacity(0.7))),
+            const SizedBox(height: 2),
+            StrokedText('ZIP!', size: 46, fill: AppColors.orangeLight, stroke: AppColors.brownDark),
           ],
         ),
       ),
